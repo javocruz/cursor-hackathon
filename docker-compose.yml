@@ -23,6 +23,7 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+psycopg://agentcanvas:agentcanvas@db:5432/agentcanvas
+      AUTH_DISABLED: "1"
     depends_on:
       db:
         condition: service_healthy

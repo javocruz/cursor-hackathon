@@ -22,6 +22,8 @@ class NodeOutput(BaseModel):
 class RunSnapshot(BaseModel):
     run_id: str
     status: Literal["pending", "running", "done", "failed"]
+    graph: Optional[dict[str, Any]] = None
+    inputs: dict[str, dict[str, Any]] = Field(default_factory=dict)
     outputs: dict[str, dict[str, Any]] = Field(default_factory=dict)
     error: Optional[str] = None
     collector_output: Optional[dict[str, Any]] = None

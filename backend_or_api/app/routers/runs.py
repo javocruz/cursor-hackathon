@@ -15,6 +15,7 @@ from ..config import Settings, get_settings
 from ..database import get_session
 from ..db_models import RunNodeOutput, RunRecord, Sandbox
 from ..deps import get_current_user_id, get_current_user_id_sse, require_sandbox_owner
+from ..graph_sync import sync_sandbox_projection
 from ..graph_validate import validate_pipeline_graph
 from ..models import PipelineGraph, ResumeRunBody, RunRequest, RunSnapshot
 from ..services.executor import run_dag_pipeline
@@ -31,6 +32,29 @@ async def _broadcast_event(run_id: str, event: dict[str, Any]) -> None:
     RUN_EVENT_LOG[run_id].append(event)
     for tick_q in list(RUN_EVENT_TICK_QUEUES[run_id]):
         await tick_q.put(None)
+
+
+def _store_node_input(run_id: str, node_id: str, input_data: dict[str, Any]) -> None:
+    with Session(database.engine) as session:
+        row = session.exec(
+            select(RunNodeOutput).where(
+                RunNodeOutput.run_id == run_id,
+                RunNodeOutput.node_id == node_id,
+            ),
+        ).first()
+        if row:
+            row.input = input_data
+            session.add(row)
+        else:
+            session.add(
+                RunNodeOutput(
+                    run_id=run_id,
+                    node_id=node_id,
+                    input=input_data,
+                    output={},
+                ),
+            )
+        session.commit()
 
 
 def _upsert_node_output(run_id: str, node_id: str, output: dict[str, Any]) -> None:
@@ -79,14 +103,44 @@ def _build_run_snapshot(session: Session, record: RunRecord) -> RunSnapshot:
     rows = session.exec(
         select(RunNodeOutput).where(RunNodeOutput.run_id == record.run_id),
     ).all()
+    inputs = {row.node_id: row.input for row in rows if row.input}
     outputs = {row.node_id: row.output for row in rows}
     return RunSnapshot(
         run_id=record.run_id,
         status=record.status,  # type: ignore[arg-type]
+        graph=record.graph,
+        inputs=inputs,
         outputs=outputs,
         error=record.error,
         collector_output=record.collector_output,
     )
+
+
+def _ensure_sandbox(session: Session, sandbox_id: str, user_id: str) -> Sandbox:
+    """Return existing sandbox (with ownership check) or auto-create one.
+
+    The frontend derives sandbox_id from a free-text name field and never
+    calls POST /sandboxes.  Instead of 404-ing we lazily create the sandbox
+    so the run can proceed.  API-created sandboxes still go through the
+    normal ownership validation path.
+    """
+    row = session.get(Sandbox, sandbox_id)
+    if row is not None:
+        if row.owner_user_id != user_id:
+            raise HTTPException(status_code=403, detail="Not allowed to access this sandbox")
+        return row
+
+    empty_graph = PipelineGraph()
+    sandbox = Sandbox(
+        id=sandbox_id,
+        name=sandbox_id,
+        owner_user_id=user_id,
+        canvas_state=empty_graph.model_dump(mode="json"),
+    )
+    session.add(sandbox)
+    session.flush()
+    sync_sandbox_projection(session, sandbox_id, empty_graph)
+    return sandbox
 
 
 def _assert_run_access(session: Session, run_id: str, user_id: str) -> RunRecord:
@@ -108,7 +162,9 @@ async def _run_pipeline_job(
     _patch_run_record(run_id, status="running")
 
     async def on_event(event: dict[str, Any]) -> None:
-        if event.get("type") == "node_complete":
+        if event.get("type") == "node_input":
+            _store_node_input(run_id, event["node_id"], event["input"])
+        elif event.get("type") == "node_complete":
             _upsert_node_output(run_id, event["node_id"], event["output"])
         elif event.get("type") == "run_complete":
             _patch_run_record(
@@ -146,8 +202,14 @@ async def start_run(
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> dict[str, str]:
-    require_sandbox_owner(session, payload.sandbox_id, user_id)
+    sandbox = _ensure_sandbox(session, payload.sandbox_id, user_id)
     validate_pipeline_graph(payload.graph)
+
+    graph_json = payload.graph.model_dump(mode="json")
+
+    sandbox.canvas_state = graph_json
+    session.add(sandbox)
+    sync_sandbox_projection(session, payload.sandbox_id, payload.graph)
 
     run_id = str(uuid.uuid4())
     record = RunRecord(
@@ -155,6 +217,7 @@ async def start_run(
         sandbox_id=payload.sandbox_id,
         status="pending",
         prompt=payload.prompt,
+        graph=graph_json,
     )
     session.add(record)
     session.commit()

@@ -29,6 +29,16 @@ async def _run_node_with_optional_judge(
     agent = create_sandbox_agent(node, settings)
 
     await on_event({"type": "node_start", "node_id": node_id})
+    await on_event({
+        "type": "node_input",
+        "node_id": node_id,
+        "input": {
+            "user_prompt": prompt,
+            "upstream_outputs": upstream,
+            "global_context": graph.global_context,
+            "assembled_message": agent._build_user_message(prompt, upstream, graph.global_context),
+        },
+    })
 
     judge_cfg: Optional[JudgeConfig] = node.judge
     max_attempts = (judge_cfg.max_retries + 1) if judge_cfg and judge_cfg.enabled else 1

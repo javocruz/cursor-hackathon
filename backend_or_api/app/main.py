@@ -70,3 +70,16 @@ async def favicon() -> FileResponse:
     if not icon.is_file():
         raise HTTPException(status_code=404, detail="Not found")
     return FileResponse(icon)
+
+
+@app.get("/{path:path}", include_in_schema=False)
+async def spa_catchall(path: str):
+    """Serve index.html for any path not matched by API routes or static mounts.
+
+    Registered last so API routes, /assets mount, /docs, and /openapi.json
+    are all checked first by Starlette's ordered route resolution.
+    """
+    index = _FRONTEND_DIST / "index.html"
+    if index.is_file():
+        return FileResponse(index)
+    raise HTTPException(status_code=404, detail="Not found")

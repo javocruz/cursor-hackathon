@@ -62,6 +62,10 @@ class RunRecord(SQLModel, table=True):
     status: str
     error: Optional[str] = None
     prompt: str
+    graph: Optional[dict[str, Any]] = Field(
+        default=None,
+        sa_column=Column(JSON, nullable=True),
+    )
     collector_output: Optional[dict[str, Any]] = Field(
         default=None,
         sa_column=Column(JSON, nullable=True),
@@ -75,6 +79,10 @@ class RunNodeOutput(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     run_id: str = Field(foreign_key="runrecord.run_id", index=True)
     node_id: str
+    input: Optional[dict[str, Any]] = Field(
+        default=None,
+        sa_column=Column("input", JSON, nullable=True),
+    )
     output: dict[str, Any] = Field(sa_column=Column(JSON, nullable=False))
 
     __table_args__ = (UniqueConstraint("run_id", "node_id", name="uq_run_node_output"),)
