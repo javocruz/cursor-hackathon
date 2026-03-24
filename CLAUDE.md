@@ -2,49 +2,98 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## What This Is
+## Project Overview
 
-A hackathon starter repo for IE University's Cursor Hackathon (March 2026). The challenge: **Make one person's hard day easier.** Teams build a focused solution during the event and deploy it live on Vercel.
+**SOCRA** — a Socratic AI Tutoring Agent built for the Cursor Hackathon 2025 at IE University.
 
-This is not an application codebase — it's a launchpad. The `starter/` folder contains a zero-dependency HTML/CSS site ready for Vercel deployment. Teams are expected to replace, extend, or completely rebuild it with whatever stack fits their solution.
+SOCRA is an agentic tutoring system powered by a curriculum dependency graph. It automatically extracts concepts and prerequisite relationships from uploaded course materials, guides students through Socratic questioning (never just giving the answer), and monitors all students in real time with teacher alerts. It is **not** a chat wrapper — it's a stateful tool-calling agent with persistent mastery modeling.
 
-## Starter Project
+## Tech Stack
 
-- `starter/index.html` — minimal HTML5 template
-- `starter/style.css` — clean CSS with flexbox centering, system fonts
-- `starter/vercel.json` — sets output directory to `.` for Vercel
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 14 (App Router, `src/` directory) |
+| Styling | Tailwind CSS v3 + shadcn/ui (classic pattern with `@radix-ui/react-slot`) |
+| Graph Visualisation | React Flow |
+| Auth | Supabase Auth (magic link, role-based: teacher/student) |
+| Database | Supabase Postgres |
+| File Storage | Supabase Storage |
+| Backend / API | Next.js API Routes (Vercel serverless) |
+| Chat Streaming | Vercel AI SDK (`ai` package) + `@ai-sdk/openai` |
+| LLM Provider | OpenAI GPT-4o (swappable via `LLM_PROVIDER` env var — Claude-ready) |
+| Deployment | Vercel (via GitHub Actions on push to `main`) |
 
-No build tools, no package.json, no JavaScript framework. If a team adds npm dependencies, they'll create their own package.json.
-
-## Deployment
+## Commands
 
 ```bash
-npx vercel
+npm run dev      # Start dev server (http://localhost:3000)
+npm run build    # Production build
+npm run start    # Start production server
+npm run lint     # ESLint
 ```
 
-Or connect the GitHub repo to Vercel and set root directory to `starter/`. The project **must** be deployed and live — judges evaluate via the URL.
+## Project Structure
 
-## Key Constraints
+```
+src/
+├── app/
+│   ├── (auth)/           # Auth route group: /login, /callback
+│   ├── (teacher)/        # Teacher route group: /dashboard
+│   ├── (student)/        # Student route group: /learn
+│   ├── api/
+│   │   ├── agent/        # POST /api/agent/chat, /quiz, /evaluate
+│   │   ├── dashboard/    # GET /api/dashboard/teacher, /student
+│   │   └── ingest/       # POST /api/ingest (document upload pipeline)
+│   ├── layout.tsx        # Root layout (Geist fonts)
+│   ├── page.tsx          # Landing page
+│   └── globals.css       # Tailwind + shadcn CSS variables
+├── components/ui/        # shadcn/ui components (button, card, badge)
+├── lib/
+│   ├── supabase/         # Supabase clients: client.ts (browser), server.ts (RSC), middleware.ts
+│   ├── types.ts          # TypeScript types matching Supabase schema
+│   └── utils.ts          # cn() helper
+└── middleware.ts          # Supabase auth session refresh
+supabase/
+└── schema.sql             # Full database schema (run in Supabase SQL Editor)
+.github/workflows/
+└── deploy.yml             # GitHub Actions: lint → build → deploy to Vercel
+```
 
-- Projects must be built during the event
-- Submission deadline: 16:00 (hard cutoff)
-- Teams of 1–4 people
-- Final submission requires a working deployed Vercel link
-- Submission via Google Form: https://forms.gle/dS1H98eJoZwsXj7e7
+## Architecture
 
-## Evaluation Criteria (from CHALLENGE.md)
+### Agent Loop (not a chatbot)
 
-1. **Understanding of the person and problem** — grounded in a real person/situation
-2. **Relevance and usefulness** — solves a real friction point concretely
-3. **Technical execution** — functional, live, reliable, polished enough to use
-4. **Creativity and interpretation** — original angle, intentional framing
-5. **Use of Cursor and technical leverage** — used tools to build something more ambitious
-6. **Presentation and storytelling** — clear narrative, real person/problem, explained decisions
+Every student interaction triggers a tool-calling loop:
+1. **Context Load** — fetch mastery profile, current concept node, session history, teacher mode
+2. **Tool Selection** — agent decides which tools to call (get_weak_concepts, generate_quiz, evaluate_response, flag_student, etc.)
+3. **Tool Execution** — Next.js API route executes against Supabase or LLM
+4. **Streamed Response** — Vercel AI SDK streams tokens before post-response tools finish
+5. **State Write** — mastery scores, session events, reasoning traces written back via `waitUntil()`
 
-## Working on This Repo
+### Assignment Modes
 
-When helping a team build their project, keep in mind:
-- Scope should be ruthlessly small — one thing that works completely beats five half-done features
-- The solution should be grounded in a specific person's real problem, not a generic product idea
-- Deploy early, not in the last hour
-- The presentation matters as much as the code — who, what problem, what you built, why it helps
+Teachers set a mode per assignment; the agent adapts within it:
+- **Explore** — generous hints, proactive explanations
+- **Guided** — Socratic questioning, hints after struggle
+- **Challenge** — withholds hints, probing follow-ups
+- **Assess** — silent, records responses for clean mastery snapshot
+
+### Data Model
+
+See `supabase/schema.sql` for the full schema. Key tables: `users`, `courses`, `concepts`, `concept_edges`, `mastery_scores`, `sessions`, `session_events`, `teacher_alerts`, `assignments`.
+
+## Environment Variables
+
+Copy `.env.example` to `.env.local` and fill in:
+- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` — from Supabase dashboard
+- `LLM_PROVIDER` — `openai` or `anthropic`
+- `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`
+- `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` — for GitHub Actions deployment
+
+## Conventions for Team Consistency
+
+- **shadcn/ui components** use the classic pattern (Tailwind v3, `@radix-ui/react-slot`, `cva`, `cn()`). When adding new shadcn components, use `npx shadcn@latest add <component>` but verify the output is Tailwind v3 compatible — if it imports `@base-ui/react`, rewrite it to use the classic Radix Slot pattern.
+- **Supabase client**: use `createClient()` from `@/lib/supabase/server` in Server Components and API routes; use `@/lib/supabase/client` in Client Components.
+- **API routes**: all LLM calls and agent logic live in `src/app/api/` as Next.js Route Handlers. No separate backend server.
+- **Types**: keep `src/lib/types.ts` in sync with `supabase/schema.sql`.
+- **LLM provider**: abstracted behind `LLM_PROVIDER` env var. Do not hardcode provider-specific logic.
