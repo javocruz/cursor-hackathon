@@ -85,7 +85,7 @@ See `supabase/schema.sql` for the full schema. Key tables: `users`, `courses`, `
 ## Environment Variables
 
 Copy `.env.example` to `.env.local` and fill in:
-- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` — from Supabase dashboard
+- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` — from Supabase dashboard
 - `LLM_PROVIDER` — `openai` or `anthropic`
 - `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`
 - `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` — for GitHub Actions deployment

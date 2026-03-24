@@ -31,7 +31,7 @@ npm run dev
 | Variable | Where to get it |
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase dashboard → Settings → API |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase dashboard → Settings → API |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase dashboard → Settings → API |
 | `LLM_PROVIDER` | Set to `openai` (or `anthropic`) |
 | `OPENAI_API_KEY` | OpenAI dashboard → API Keys |
 | `VERCEL_TOKEN` | Vercel dashboard → Settings → Tokens |
@@ -43,7 +43,7 @@ npm run dev
 1. Create a new Supabase project at [supabase.com](https://supabase.com)
 2. Go to SQL Editor
 3. Paste and run the contents of `supabase/schema.sql`
-4. Copy the URL and anon key into `.env.local`
+4. Copy the URL and publishable default key into `.env.local`
 
 ### GitHub Actions (Vercel Deployment)
 
