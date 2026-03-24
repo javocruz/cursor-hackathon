@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx:*)",
+      "Bash(cp socra-temp/next.config.mjs socra-temp/next-env.d.ts socra-temp/package.json socra-temp/package-lock.json socra-temp/postcss.config.mjs socra-temp/tailwind.config.ts socra-temp/tsconfig.json .)",
+      "Bash(cp -r socra-temp/src .)",
+      "Bash(rm -rf socra-temp)",
+      "Bash(npm install:*)"
+    ]
+  }
+}
