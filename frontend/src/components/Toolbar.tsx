@@ -1,8 +1,12 @@
+import { authFetch, sseUrl } from "../lib/api";
 import { validateGraphForRun, withPrompt } from "../lib/graph";
+import { useAuthStore } from "../stores/authStore";
 import { useCanvasStore } from "../stores/canvasStore";
 import { useRunStore } from "../stores/runStore";
 
 export function Toolbar() {
+  const email = useAuthStore((s) => s.email);
+  const logout = useAuthStore((s) => s.logout);
   const sandboxName = useCanvasStore((s) => s.sandboxName);
   const setSandboxName = useCanvasStore((s) => s.setSandboxName);
   const prompt = useCanvasStore((s) => s.prompt);
@@ -47,7 +51,7 @@ export function Toolbar() {
 
     let res: Response;
     try {
-      res = await fetch("/runs", {
+      res = await authFetch("/runs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -73,7 +77,7 @@ export function Toolbar() {
 
     setRunId(data.run_id);
 
-    const es = new EventSource(`/runs/${data.run_id}/events`);
+    const es = new EventSource(sseUrl(`/runs/${data.run_id}/events`));
 
     es.onmessage = (msg) => {
       try {
@@ -147,6 +151,15 @@ export function Toolbar() {
           className="rounded-lg bg-canvas-accent px-4 py-1.5 text-sm font-semibold text-white shadow hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isRunning ? "Running…" : "Run pipeline"}
+        </button>
+        <div className="mx-1 h-6 w-px bg-canvas-border" />
+        {email && <span className="text-xs text-slate-400">{email}</span>}
+        <button
+          type="button"
+          onClick={logout}
+          className="rounded-lg border border-canvas-border bg-canvas-bg px-3 py-1.5 text-sm text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+        >
+          Logout
         </button>
       </div>
     </header>
