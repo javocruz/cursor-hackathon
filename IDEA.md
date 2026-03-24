@@ -10,21 +10,25 @@ AgentCanvas is a browser-based platform that reimagines the AI chat interface. I
 
 Each sandbox is a self-contained project. Within it, users place **Agent Nodes** that each carry a specific role, a model configuration, an input/output schema, and contextual instructions. Agents are connected via directed edges (arrows) that represent the flow of data. When the pipeline is run, each agent executes in topological order — outputs from upstream agents become inputs to downstream ones — until a final **Collector Node** assembles the complete result.
 
-This is not a workflow automation tool (à la n8n or Zapier). The agents here are *intelligent* — they reason, synthesize, produce structured content, write code, and reflect on prior outputs. The canvas is the interface to that intelligence.
+This is not a workflow automation tool (à la n8n or Zapier). The agents here are _intelligent_ — they reason, synthesize, produce structured content, write code, and reflect on prior outputs. The canvas is the interface to that intelligence.
 
 ---
 
 ## 2. Key Entities
 
 ### 2.1 Sandbox
+
 A named, persistent workspace stored per user. Think of it as a "project". It contains:
+
 - A canvas (node graph) with agents and connections
 - A global context panel (shared variables, files, references all agents can read)
 - A run history log
 - An output panel showing the final assembled result
 
 ### 2.2 Agent Node
+
 The fundamental unit. Each agent has:
+
 - **Name** — user-defined label (e.g. "Researcher", "Writer", "Simulation Engineer")
 - **Role / System Prompt** — what this agent does, written by the user in natural language
 - **Model** — which LLM powers this agent (e.g. Claude Sonnet, Opus, etc.)
@@ -34,18 +38,23 @@ The fundamental unit. Each agent has:
 - **Preview Panel** — shows its output once run
 
 ### 2.3 Edge (Connection)
+
 A directed arrow between two agent nodes. Carries:
+
 - Which output field from the source maps to which input field in the destination
 - Optional transformation instructions (e.g. "summarize before passing")
 
 ### 2.4 Collector Node
+
 A special terminal node that:
+
 - Accepts connections from multiple agents
 - Merges all upstream outputs into a single structured document
 - Can optionally use an LLM pass to synthesize/integrate results
 - Renders the final output as Markdown, PDF export, or downloadable archive
 
 ### 2.5 Global Context
+
 A sidebar panel where users upload files, paste reference material, or define global variables. All agents in the sandbox can optionally read from this shared context.
 
 ---
@@ -97,6 +106,7 @@ A sidebar panel where users upload files, paste reference material, or define gl
 A single Next.js 14+ application using App Router and Server Actions. The canvas is a React-based node editor (using `reactflow`). Agent execution happens in Next.js API routes that stream responses from the Anthropic API using the Vercel AI SDK.
 
 **Stack:**
+
 - Frontend: Next.js + React + ReactFlow (canvas) + Tailwind
 - Backend: Next.js API routes / Server Actions
 - LLM: Anthropic API via Vercel AI SDK (`streamText`)
@@ -105,6 +115,7 @@ A single Next.js 14+ application using App Router and Server Actions. The canvas
 - Deployment: Vercel
 
 **Execution Model:**
+
 - On "Run", the client sends the full pipeline graph to a single `/api/run` endpoint.
 - The server resolves topological order, then calls agents sequentially (or in parallel where possible).
 - Each agent call streams back via SSE (Server-Sent Events) to the client.
@@ -121,6 +132,7 @@ A single Next.js 14+ application using App Router and Server Actions. The canvas
 A React SPA frontend (Vite + ReactFlow) talking to a Python FastAPI backend. Agent execution is handed off to a Celery/Redis task queue, enabling true async, parallel, and resumable execution. Results are streamed back via WebSockets.
 
 **Stack:**
+
 - Frontend: React + Vite + ReactFlow + Zustand (state) + Tailwind
 - Backend: FastAPI (Python)
 - Task Queue: Celery + Redis
@@ -130,6 +142,7 @@ A React SPA frontend (Vite + ReactFlow) talking to a Python FastAPI backend. Age
 - Deployment: Docker Compose → Kubernetes or Railway/Render
 
 **Execution Model:**
+
 - On "Run", the API receives the graph, validates it, then enqueues tasks in topological order.
 - Celery workers execute agents concurrently where the graph allows (nodes with no interdependency run in parallel).
 - Each running agent streams tokens back to Redis, which the WebSocket endpoint forwards to the connected frontend client in real time.
@@ -140,27 +153,113 @@ A React SPA frontend (Vite + ReactFlow) talking to a Python FastAPI backend. Age
 
 ---
 
-### Architecture C — Cloudflare Workers + Durable Objects (Edge-Native, Globally Distributed)
+### Architecture C — FastAPI + PydanticAI + WebSockets ✅ CHOSEN
 
 **Overview:**
-The entire backend runs on Cloudflare's edge infrastructure. Each Sandbox run is a **Durable Object** — a persistent, stateful actor that orchestrates agent execution and manages WebSocket connections. Agent calls are made from Workers directly to the Anthropic API.
+A decoupled architecture built around **PydanticAI** as the agent execution framework. A React SPA frontend communicates with a FastAPI backend over WebSockets for real-time streaming. PydanticAI handles structured agent definitions, typed inter-agent data passing, MCP tool integration, and LLM-as-judge validation. A lightweight homegrown DAG executor (≈150 lines) orchestrates the graph — resolving topological order, running independent branches concurrently via `asyncio.gather()`, and streaming execution events back to the canvas in real time.
 
 **Stack:**
-- Frontend: React + Vite + ReactFlow, served via Cloudflare Pages
-- Backend: Cloudflare Workers (API) + Durable Objects (run orchestration + WebSocket hub)
-- LLM: Anthropic API (called from Workers)
-- Storage: Cloudflare D1 (SQLite, for sandbox/agent metadata) + Durable Object storage (run state)
-- Auth: Cloudflare Access or custom JWT validated at the Worker edge
-- Deployment: Fully Cloudflare (zero ops)
+
+- Frontend: React + Vite + ReactFlow (XY Flow) + Zustand + Tailwind
+- Backend: FastAPI (Python, async)
+- Agent Framework: PydanticAI
+- LLM: Anthropic API via PydanticAI's Anthropic provider (per-agent model config)
+- Storage: PostgreSQL via SQLModel (sandbox/agent/edge metadata + run history)
+- Run State: In-memory async state during execution; persisted to Postgres on completion
+- Auth: JWT (FastAPI-Users)
+- MCP: PydanticAI MCP client — agents can be assigned MCP servers (brave-search, filesystem, code-execution, etc.) from the canvas UI
+- Deployment: Docker Compose (dev) → Railway / Render / fly.io (prod)
 
 **Execution Model:**
-- On "Run", the client connects to a Durable Object instance for that sandbox run via WebSocket.
-- The Durable Object resolves the execution graph and fans out fetch() calls to the Anthropic API for each agent, respecting dependency order.
-- Token streams are forwarded from each Anthropic response back through the Durable Object to the connected client in real time.
-- Run state lives in the Durable Object's storage, making it resumable across reconnects.
 
-**Pros:** Zero cold starts, globally distributed, extremely low latency, fully serverless with no ops burden, WebSocket support is native.  
-**Cons:** Durable Objects have compute and memory limits. Cloudflare ecosystem lock-in. Less mature tooling vs. Node/Python ecosystems. Debugging is harder.
+```
+Canvas UI
+  │  (WebSocket: /ws/run/{sandbox_id})
+  ▼
+FastAPI WebSocket Handler
+  │
+  ▼
+DAG Executor (homegrown, ~150 lines)
+  ├── 1. Topological sort of the agent graph
+  ├── 2. Identify independent branches → asyncio.gather() for parallel runs
+  ├── 3. For each agent node in order:
+  │     ├── Inject upstream outputs + global context via RunContext[Deps]
+  │     ├── Call pydantic_agent.run_stream(prompt, deps=ctx)
+  │     ├── Forward token chunks → WebSocket → canvas node (live streaming)
+  │     └── Validate output against agent's Pydantic output model
+  └── 4. Collector Node: merge all outputs → final PydanticAI synthesis pass
+```
+
+**PydanticAI Agent Definition (per node):**
+
+```python
+from pydantic import BaseModel
+from pydantic_ai import Agent
+
+class ResearchSummary(BaseModel):
+    overview: str
+    key_concepts: list[str]
+    sim_params: dict
+    confidence: float  # used by LLM judge
+
+researcher = Agent(
+    model="claude-sonnet-4-5",
+    output_type=ResearchSummary,
+    system_prompt="You are a deep research agent specialising in atomic structures...",
+    mcp_servers=[brave_search_mcp, arxiv_mcp],  # configured per node in UI
+)
+```
+
+**Structured Inter-Agent Data Flow:**
+Each agent's `output_type` is a Pydantic model. When an agent completes, its validated output object is stored in the run context and injected directly into downstream agents — no string parsing, no prompt hacking. The canvas UI reads the output schema to render a typed preview panel per node.
+
+**LLM Judge Nodes:**
+A special `ValidatorNode` type wraps any agent output with a judge agent that scores it against defined criteria before allowing data to flow downstream. If the score falls below a threshold, the node can re-run the upstream agent with augmented instructions (retry loop with max attempts).
+
+```python
+judge = Agent(
+    model="claude-opus-4-5",
+    output_type=JudgeVerdict,  # { passed: bool, score: float, feedback: str }
+    system_prompt="Evaluate the research summary for completeness and accuracy...",
+)
+```
+
+**MCP Tool Assignment:**
+From the canvas UI, each agent node has an "Add Tools" panel where users can attach MCP servers. The backend maps these to PydanticAI `MCPServerStdio` or `MCPServerHTTP` instances and injects them into the agent at run time. Example assignments:
+
+- Agent 1 (Researcher) → `brave-search` MCP + `arxiv` MCP
+- Agent 3 (C++ Engineer) → `filesystem` MCP + `code-execution` MCP
+- Collector → `filesystem` MCP (to write final output files)
+
+**WebSocket Event Protocol:**
+The backend streams typed JSON events over the WebSocket connection:
+
+```json
+{ "type": "node_start",    "node_id": "agent_1" }
+{ "type": "token_chunk",   "node_id": "agent_1", "chunk": "Atomic structures are..." }
+{ "type": "node_complete", "node_id": "agent_1", "output": { "overview": "...", ... } }
+{ "type": "node_error",    "node_id": "agent_1", "error": "Rate limit exceeded" }
+{ "type": "run_complete",  "collector_output": { ... } }
+```
+
+The canvas frontend maps these events to node status indicators, streaming text panels, and edge animations.
+
+**Pros:**
+
+- Structured, typed outputs make inter-agent data passing robust and inspectable
+- True async parallel execution of independent graph branches
+- MCP tool support is first-class and user-configurable per node
+- LLM judge nodes are native to the framework
+- Multi-model per node (mix Claude, GPT-4o, Gemini on the same canvas)
+- No vendor lock-in beyond Anthropic API; deploy anywhere Docker runs
+- FastAPI + SQLModel is a clean, well-documented Python stack
+
+**Cons:**
+
+- PydanticAI is relatively new (less community resources than LangChain)
+- The DAG executor needs to be built and maintained (not a framework feature)
+- No built-in checkpointing/resumability — a failed mid-pipeline run must restart (mitigable by persisting per-node outputs to Postgres as they complete)
+- Requires Python backend knowledge; not a pure JS stack
 
 ---
 
@@ -170,6 +269,7 @@ The entire backend runs on Cloudflare's edge infrastructure. Each Sandbox run is
 The most powerful and extensible architecture. Agent orchestration is handled by **LangGraph** (a stateful graph execution framework built on LangChain). A React frontend communicates with a thin API gateway. Each agent is a LangGraph node. The graph executes as a persistent, resumable state machine. Results stream back via SSE.
 
 **Stack:**
+
 - Frontend: React + Vite + ReactFlow + Tailwind
 - API Gateway: FastAPI or Node.js Express
 - Orchestration Engine: LangGraph (Python) running as a separate service
@@ -180,6 +280,7 @@ The most powerful and extensible architecture. Agent orchestration is handled by
 - Deployment: Docker Compose or Kubernetes
 
 **Execution Model:**
+
 - The sandbox graph is serialized and submitted to the LangGraph service as a compiled `StateGraph`.
 - LangGraph manages execution order, state passing between nodes, conditional branching (if needed), and checkpointing for resumability.
 - The API gateway streams LangGraph events (node start, token chunk, node end) as SSE to the frontend.
@@ -190,11 +291,13 @@ The most powerful and extensible architecture. Agent orchestration is handled by
 
 ---
 
-## 6. Recommended Starting Point
+## 6. Chosen Architecture
 
-For a first version (MVP), **Architecture A** is the pragmatic choice — it ships fastest and covers the core use case (linear/DAG pipelines, sequential execution, streaming output). 
+**Architecture C (FastAPI + PydanticAI + WebSockets)** is the selected approach.
 
-Once product-market fit is established and pipelines grow more complex (parallel execution, loops, large graphs, enterprise usage), migrate the execution engine to **Architecture B or D** while keeping the frontend unchanged — the canvas and API contract are backend-agnostic.
+It hits the right balance: PydanticAI gives structured, typed agent outputs and first-class MCP + judge support out of the box; FastAPI's async model makes the DAG executor clean and parallel execution natural; and the stack deploys anywhere without platform lock-in. The only piece that needs to be custom-built is the DAG executor, which is a feature, not a burden — it means full control over execution semantics (retry logic, partial re-runs, streaming granularity) without being constrained by an opinionated framework.
+
+The other architectures remain documented for reference. Architecture B (Celery) becomes relevant if run volumes grow large enough to need horizontally scaled workers. Architecture D (LangGraph) becomes relevant if conditional branching and cycle support become critical product features.
 
 ---
 
@@ -202,12 +305,12 @@ Once product-market fit is established and pipelines grow more complex (parallel
 
 Regardless of backend choice, the canvas layer needs a solid node-graph library:
 
-| Library | Pros | Cons |
-|---|---|---|
-| **React Flow** | Most popular, great DX, built-in edge routing | React-only, some performance limits at scale |
-| **Rete.js** | Framework-agnostic, plugin system | Smaller community, steeper learning curve |
-| **Litegraph.js** | Used in ComfyUI, very performant | Low-level, requires more custom UI work |
-| **XY Flow (React Flow v12)** | Latest evolution of React Flow, improved perf | Still React-only |
+| Library                      | Pros                                          | Cons                                         |
+| ---------------------------- | --------------------------------------------- | -------------------------------------------- |
+| **React Flow**               | Most popular, great DX, built-in edge routing | React-only, some performance limits at scale |
+| **Rete.js**                  | Framework-agnostic, plugin system             | Smaller community, steeper learning curve    |
+| **Litegraph.js**             | Used in ComfyUI, very performant              | Low-level, requires more custom UI work      |
+| **XY Flow (React Flow v12)** | Latest evolution of React Flow, improved perf | Still React-only                             |
 
 **Recommendation:** React Flow (XY Flow) for MVP. Its ecosystem, documentation, and examples are unmatched for this use case.
 
@@ -226,4 +329,4 @@ Regardless of backend choice, the canvas layer needs a solid node-graph library:
 
 ---
 
-*End of IDEA.md*
+_End of IDEA.md_
