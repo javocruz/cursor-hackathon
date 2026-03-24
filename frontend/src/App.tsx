@@ -1,11 +1,22 @@
+import { Navigate, Route, Routes } from "react-router-dom";
+
 import { FlowCanvas } from "./components/FlowCanvas";
 import { EventsLog } from "./components/EventsLog";
 import { Inspector } from "./components/Inspector";
 import { Palette } from "./components/Palette";
 import { Toast } from "./components/Toast";
 import { Toolbar } from "./components/Toolbar";
+import { LoginPage } from "./pages/LoginPage";
+import { SignupPage } from "./pages/SignupPage";
+import { useAuthStore } from "./stores/authStore";
 
-export default function App() {
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = useAuthStore((s) => s.token);
+  if (!token) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+function CanvasLayout() {
   return (
     <div className="flex h-full flex-col">
       <Toolbar />
@@ -21,5 +32,22 @@ export default function App() {
       </div>
       <Toast />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
+      <Route
+        path="/*"
+        element={
+          <ProtectedRoute>
+            <CanvasLayout />
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
   );
 }

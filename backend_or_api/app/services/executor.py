@@ -29,6 +29,16 @@ async def _run_node_with_optional_judge(
     agent = create_sandbox_agent(node, settings)
 
     await on_event({"type": "node_start", "node_id": node_id})
+    await on_event({
+        "type": "node_input",
+        "node_id": node_id,
+        "input": {
+            "user_prompt": prompt,
+            "upstream_outputs": upstream,
+            "global_context": graph.global_context,
+            "assembled_message": agent._build_user_message(prompt, upstream, graph.global_context),
+        },
+    })
 
     judge_cfg: Optional[JudgeConfig] = node.judge
     max_attempts = (judge_cfg.max_retries + 1) if judge_cfg and judge_cfg.enabled else 1
@@ -114,14 +124,22 @@ async def run_dag_pipeline(
     prompt: str,
     on_event: OnEvent,
     settings: Settings,
+    *,
+    initial_outputs: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, list[dict[str, Any]]]]:
     layers = topological_layers(graph)
     node_lookup = node_map(graph)
-    outputs: dict[str, dict[str, Any]] = {}
+    outputs: dict[str, dict[str, Any]] = dict(initial_outputs or {})
     judge_history: dict[str, list[dict[str, Any]]] = {}
     judge_service = LLMJudgeService(settings)
 
     async def run_single(node_id: str) -> None:
+        if node_id in outputs:
+            await on_event({"type": "node_start", "node_id": node_id, "resumed": True})
+            await on_event(
+                {"type": "node_complete", "node_id": node_id, "output": outputs[node_id], "resumed": True},
+            )
+            return
         await _run_node_with_optional_judge(
             graph=graph,
             node_id=node_id,

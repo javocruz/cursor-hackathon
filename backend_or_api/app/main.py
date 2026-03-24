@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -7,7 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .routers import graph, health, meta, runs
+from .database import init_db
+from .routers import auth, graph, health, meta, runs, sandboxes
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    init_db()
+    yield
+
 
 app = FastAPI(
     title="AgentCanvas API",
@@ -16,6 +24,7 @@ app = FastAPI(
         "Sandbox multi-agent orchestration backend with Pydantic models, "
         "PydanticAI agents/judges, DAG execution, and SSE streaming."
     ),
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -27,6 +36,8 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(meta.router)
+app.include_router(auth.router)
+app.include_router(sandboxes.router)
 app.include_router(runs.router)
 app.include_router(graph.router)
 
@@ -59,3 +70,16 @@ async def favicon() -> FileResponse:
     if not icon.is_file():
         raise HTTPException(status_code=404, detail="Not found")
     return FileResponse(icon)
+
+
+@app.get("/{path:path}", include_in_schema=False)
+async def spa_catchall(path: str):
+    """Serve index.html for any path not matched by API routes or static mounts.
+
+    Registered last so API routes, /assets mount, /docs, and /openapi.json
+    are all checked first by Starlette's ordered route resolution.
+    """
+    index = _FRONTEND_DIST / "index.html"
+    if index.is_file():
+        return FileResponse(index)
+    raise HTTPException(status_code=404, detail="Not found")
