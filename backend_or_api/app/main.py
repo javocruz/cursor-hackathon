@@ -4,11 +4,13 @@ import asyncio
 import json
 import uuid
 from collections import defaultdict
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 from .executor import run_dag_pipeline
 from .models import RunRequest, RunSnapshot
@@ -31,6 +33,13 @@ async def _broadcast_event(run_id: str, event: dict[str, Any]) -> None:
         await queue.put(event)
 
 
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+_FRONTEND_DIST = _REPO_ROOT / "frontend" / "dist"
+
+if (_FRONTEND_DIST / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIST / "assets")), name="assets")
+
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -38,7 +47,21 @@ async def health() -> dict[str, str]:
 
 @app.get("/")
 async def root() -> FileResponse:
-    return FileResponse("frontend/index.html")
+    index = _FRONTEND_DIST / "index.html"
+    if index.is_file():
+        return FileResponse(index)
+    raise HTTPException(
+        status_code=503,
+        detail="Frontend not built. From repo root: cd frontend && npm install && npm run build",
+    )
+
+
+@app.get("/favicon.svg", include_in_schema=False)
+async def favicon() -> FileResponse:
+    icon = _FRONTEND_DIST / "favicon.svg"
+    if not icon.is_file():
+        raise HTTPException(status_code=404, detail="Not found")
+    return FileResponse(icon)
 
 
 @app.post("/runs")
@@ -97,4 +120,3 @@ async def stream_run_events(run_id: str) -> StreamingResponse:
                 RUN_QUEUES[run_id].remove(queue)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
-
