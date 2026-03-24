@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **SOCRA** — a Socratic AI Tutoring Agent built for the Cursor Hackathon 2025 at IE University.
 
-SOCRA is an agentic tutoring system powered by a curriculum dependency graph. It automatically extracts concepts and prerequisite relationships from uploaded course materials, guides students through Socratic questioning (never just giving the answer), and monitors all students in real time with teacher alerts. It is **not** a chat wrapper — it's a stateful tool-calling agent with persistent mastery modeling.
+SOCRA is an agentic tutoring system powered by a curriculum dependency graph. It automatically extracts concepts and prerequisite relationships from uploaded course materials, guides students through Socratic questioning (never just giving the answer), and monitors all students in real time with teacher alerts. It is **not** a chat wrapper — it's a stateful tool-calling agent with persistent mastery modeling..
 
 ## Tech Stack
 
