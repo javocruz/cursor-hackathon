@@ -99,7 +99,7 @@ function FlowCanvasInner() {
         onNodeClick={(_, node) => setSelectedId(node.id)}
         onPaneClick={() => setSelectedId(null)}
         defaultEdgeOptions={defaultEdgeOptions}
-        connectionMode={ConnectionMode.Loose}
+        connectionMode={ConnectionMode.Strict}
         connectionLineStyle={connectionLineStyle}
         fitView
         fitViewOptions={{ padding: 0.2 }}
