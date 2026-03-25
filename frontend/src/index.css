@@ -108,6 +108,17 @@ body {
   --xy-handle-border-color: rgba(13, 148, 136, 0.5) !important;
 }
 
+/* Force custom node wrappers to be transparent — our node components handle their own backgrounds */
+.react-flow__node-agent,
+.react-flow__node-collector {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
 /* Additional React Flow cosmetic styling */
 .react-flow__controls {
   border-radius: 12px !important;

@@ -57,7 +57,7 @@ export function Palette() {
               e.dataTransfer.effectAllowed = "move";
             }}
             className="group rounded-xl border px-3 py-2.5 text-left shadow-panel transition hover:border-canvas-accent/35 hover:shadow-node active:cursor-grabbing"
-            style={{ borderColor: "var(--ac-border)", background: "var(--ac-surface)" }}
+            style={{ borderColor: "var(--ac-border)", backgroundColor: "var(--ac-node-bg)", backgroundImage: "linear-gradient(to bottom, var(--ac-node-bg-from), var(--ac-node-bg-to))" }}
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--ac-ink)" }}>{t.label}</span>
@@ -75,8 +75,8 @@ export function Palette() {
             e.dataTransfer.setData("application/reactflow", JSON.stringify({ kind: "agent" }));
             e.dataTransfer.effectAllowed = "move";
           }}
-          className="rounded-xl border border-dashed bg-transparent px-3 py-2.5 text-left text-sm transition hover:border-canvas-accent/40"
-          style={{ borderColor: "var(--ac-border)", color: "var(--ac-muted)" }}
+          className="rounded-xl border border-dashed px-3 py-2.5 text-left text-sm transition hover:border-canvas-accent/40"
+          style={{ borderColor: "var(--ac-border)", color: "var(--ac-muted)", backgroundColor: "var(--ac-node-bg)" }}
         >
           Blank agent
         </button>
@@ -87,7 +87,8 @@ export function Palette() {
             e.dataTransfer.setData("application/reactflow", JSON.stringify({ kind: "collector" }));
             e.dataTransfer.effectAllowed = "move";
           }}
-          className="mt-1 rounded-xl border border-canvas-accent/25 bg-gradient-to-br from-canvas-accent/10 to-sky-500/5 px-3 py-2.5 text-left text-sm font-semibold text-canvas-accent shadow-panel transition hover:border-canvas-accent/45 hover:from-canvas-accent/15"
+          className="mt-1 rounded-xl border px-3 py-2.5 text-left text-sm font-semibold shadow-panel transition hover:border-canvas-accent/45"
+          style={{ borderColor: "rgba(45,212,191,0.25)", backgroundColor: "var(--ac-node-bg)", backgroundImage: "linear-gradient(135deg, rgba(45,212,191,0.1), var(--ac-node-bg-from), var(--ac-node-bg-to))", color: "var(--ac-accent)" }}
         >
           Collector
         </button>

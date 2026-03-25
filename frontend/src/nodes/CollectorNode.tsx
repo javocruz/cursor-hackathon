@@ -3,10 +3,12 @@ import type { Node } from "@xyflow/react";
 
 import type { CollectorData } from "../lib/graph";
 import { useRunStore } from "../stores/runStore";
+import { useThemeStore } from "../stores/themeStore";
 
 export type CollectorRFNode = Node<CollectorData, "collector">;
 
 export function CollectorNode({ data, selected }: NodeProps<CollectorRFNode>) {
+  const isDark = useThemeStore((s) => s.theme === "dark");
   const done = useRunStore((s) => s.collectorOutput !== null);
   const running = useRunStore((s) => s.isRunning);
 
@@ -15,7 +17,13 @@ export function CollectorNode({ data, selected }: NodeProps<CollectorRFNode>) {
       className={`relative min-w-[208px] overflow-hidden rounded-2xl border px-3.5 py-3 shadow-node transition-all ${
         selected ? "border-canvas-accent/45 shadow-node-selected" : "hover:border-[var(--ac-accent)]"
       }`}
-      style={{ borderColor: selected ? undefined : "var(--ac-border)", backgroundColor: "var(--ac-node-bg)", backgroundImage: "linear-gradient(135deg, rgba(45,212,191,0.08), var(--ac-node-bg-from), var(--ac-node-bg-to))" }}
+      style={{
+        borderColor: selected ? undefined : isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.1)",
+        backgroundColor: isDark ? "#0f1219" : "#ffffff",
+        backgroundImage: isDark
+          ? "linear-gradient(135deg, rgba(45,212,191,0.08), #141a24, #0b0e14)"
+          : "linear-gradient(135deg, rgba(13,148,136,0.08), #ffffff, #f1f5f9)",
+      }}
     >
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-canvas-accent/60 to-transparent"

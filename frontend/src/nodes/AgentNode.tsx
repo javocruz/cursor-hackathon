@@ -5,6 +5,7 @@ import type { Node } from "@xyflow/react";
 import type { AgentData } from "../lib/graph";
 import { stripModelArtifacts } from "../lib/stripArtifacts";
 import { useRunStore } from "../stores/runStore";
+import { useThemeStore } from "../stores/themeStore";
 
 export type AgentRFNode = Node<AgentData, "agent">;
 
@@ -16,6 +17,7 @@ const statusStyles: Record<string, string> = {
 };
 
 export function AgentNode({ id, data, selected }: NodeProps<AgentRFNode>) {
+  const isDark = useThemeStore((s) => s.theme === "dark");
   const status = useRunStore((s) => s.nodeStatus[id] ?? "idle");
   const live = useRunStore((s) => s.streamText[id] ?? "");
   const output = useRunStore((s) => s.nodeOutputs[id]);
@@ -45,7 +47,13 @@ export function AgentNode({ id, data, selected }: NodeProps<AgentRFNode>) {
       className={`flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border px-3.5 py-2.5 shadow-node transition-shadow ${
         selected ? "border-canvas-accent/50 shadow-node-selected" : "hover:border-[var(--ac-accent)]"
       }`}
-      style={{ borderColor: selected ? undefined : "var(--ac-border)", backgroundColor: "var(--ac-node-bg)", backgroundImage: "linear-gradient(to bottom, var(--ac-node-bg-from), var(--ac-node-bg-to))" }}
+      style={{
+        borderColor: selected ? undefined : isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.1)",
+        backgroundColor: isDark ? "#0f1219" : "#ffffff",
+        backgroundImage: isDark
+          ? "linear-gradient(to bottom, #141a24, #0b0e14)"
+          : "linear-gradient(to bottom, #ffffff, #f1f5f9)",
+      }}
     >
       <NodeResizer
         minWidth={228}
