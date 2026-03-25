@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+pydantic-ai-slim[openai,anthropic]>=1.0,<2.0
+sqlmodel
+psycopg[binary]
+alembic
+python-jose[cryptography]
+passlib
