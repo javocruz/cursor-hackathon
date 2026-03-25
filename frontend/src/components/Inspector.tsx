@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 
+import { CollectorOutputView } from "./CollectorOutputView";
 import { validateGraphForRun, withPrompt } from "../lib/graph";
 import { useCanvasStore } from "../stores/canvasStore";
 import { useRunStore } from "../stores/runStore";
@@ -177,24 +178,101 @@ export function Inspector() {
     );
   }
 
-  const cd = selected.data as { name: string };
+  const cd = selected.data as {
+    name: string;
+    role: string;
+    provider: "openai" | "anthropic";
+    model: string;
+    temperature: number;
+    output_key: string;
+    output_type: string;
+  };
+  const collectorProvider = cd.provider === "anthropic" ? "anthropic" : "openai";
 
   return (
     <aside className="flex w-[22rem] shrink-0 flex-col border-l border-canvas-border bg-canvas-elevated/75 backdrop-blur-xl">
       <div className="ac-panel-header border-canvas-accent/20 bg-gradient-to-r from-canvas-accent/10 to-transparent">
         <h2 className="ac-panel-title text-canvas-accent">Collector</h2>
-        <p className="ac-panel-sub">Terminal merge for this run</p>
+        <p className="ac-panel-sub">Final synthesis agent</p>
       </div>
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
         <label className="ac-label">
           Name
-          <input className="ac-input" value={cd.name} onChange={(e) => updateNodeData(selected.id, { name: e.target.value })} />
+          <input className="ac-input" value={cd.name ?? "Collector"} onChange={(e) => updateNodeData(selected.id, { name: e.target.value })} />
+        </label>
+        <label className="ac-label">
+          Collector instructions
+          <textarea
+            className="ac-input min-h-[96px] resize-y"
+            value={cd.role ?? "Summarize the directly connected agent outputs into a clear final report."}
+            onChange={(e) => updateNodeData(selected.id, { role: e.target.value })}
+          />
+        </label>
+        <label className="ac-label">
+          Model provider
+          <select
+            className="ac-input"
+            value={collectorProvider}
+            onChange={(e) => {
+              const provider = e.target.value === "anthropic" ? "anthropic" : "openai";
+              const fallbackModel = MODEL_OPTIONS[provider][0]?.value ?? "";
+              updateNodeData(selected.id, { provider, model: fallbackModel });
+            }}
+          >
+            <option value="openai">ChatGPT (OpenAI)</option>
+            <option value="anthropic">Claude (Anthropic)</option>
+          </select>
+        </label>
+        <label className="ac-label">
+          Model
+          <select
+            className="ac-input"
+            value={cd.model ?? MODEL_OPTIONS[collectorProvider][0]?.value ?? ""}
+            onChange={(e) => updateNodeData(selected.id, { model: e.target.value })}
+          >
+            {MODEL_OPTIONS[collectorProvider].map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="ac-label">
+          Temperature ({typeof cd.temperature === "number" ? cd.temperature.toFixed(2) : "0.40"})
+          <input
+            className="mt-2 h-2 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-canvas-accent [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-canvas-accent [&::-webkit-slider-thumb]:shadow-[0_0_12px_rgba(45,212,191,0.5)]"
+            type="range"
+            min={0}
+            max={2}
+            step={0.1}
+            value={typeof cd.temperature === "number" ? cd.temperature : 0.4}
+            onChange={(e) => updateNodeData(selected.id, { temperature: Number(e.target.value) })}
+          />
+        </label>
+        <label className="ac-label">
+          Output key
+          <input
+            className="ac-input font-mono text-xs"
+            value={cd.output_key ?? "final_report"}
+            onChange={(e) => updateNodeData(selected.id, { output_key: e.target.value })}
+          />
+        </label>
+        <label className="ac-label">
+          Output type
+          <select
+            className="ac-input"
+            value={cd.output_type === "json" ? "json" : "text"}
+            onChange={(e) =>
+              updateNodeData(selected.id, { output_type: e.target.value === "json" ? "json" : "text" })
+            }
+          >
+            <option value="text">text</option>
+            <option value="json">json</option>
+          </select>
         </label>
         <div>
           <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Final output</div>
-          <pre className="max-h-[min(22rem,50vh)] overflow-auto rounded-xl border border-canvas-border bg-black/35 p-3 font-mono text-[10px] leading-relaxed text-slate-300 shadow-inner">
-            {collectorOutput != null ? JSON.stringify(collectorOutput, null, 2) : "Run the pipeline to merge upstream outputs here."}
-          </pre>
+          <CollectorOutputView collectorOutput={collectorOutput} />
         </div>
       </div>
     </aside>
