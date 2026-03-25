@@ -3,18 +3,27 @@ import type { Node } from "@xyflow/react";
 
 import type { CollectorData } from "../lib/graph";
 import { useRunStore } from "../stores/runStore";
+import { useThemeStore } from "../stores/themeStore";
 
 export type CollectorRFNode = Node<CollectorData, "collector">;
 
 export function CollectorNode({ data, selected }: NodeProps<CollectorRFNode>) {
+  const isDark = useThemeStore((s) => s.theme === "dark");
   const done = useRunStore((s) => s.collectorOutput !== null);
   const running = useRunStore((s) => s.isRunning);
 
   return (
     <div
-      className={`relative min-w-[208px] overflow-hidden rounded-2xl border bg-gradient-to-br from-canvas-accent/15 via-canvas-elevated to-black/40 px-3.5 py-3 shadow-node backdrop-blur-sm transition-all ${
-        selected ? "border-canvas-accent/45 shadow-node-selected" : "border-canvas-border hover:border-canvas-accent/25"
+      className={`relative min-w-[208px] overflow-hidden rounded-2xl border px-3.5 py-3 shadow-node transition-all ${
+        selected ? "border-canvas-accent/45 shadow-node-selected" : "hover:border-[var(--ac-accent)]"
       }`}
+      style={{
+        borderColor: selected ? undefined : isDark ? "rgba(45,212,191,0.25)" : "rgba(0,0,0,0.12)",
+        backgroundColor: isDark ? "#0f1219" : "#ffffff",
+        backgroundImage: isDark
+          ? "linear-gradient(135deg, rgba(45,212,191,0.08), #141a24, #0b0e14)"
+          : "linear-gradient(135deg, rgba(13,148,136,0.08), #ffffff, #f1f5f9)",
+      }}
     >
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-canvas-accent/60 to-transparent"
@@ -23,18 +32,20 @@ export function CollectorNode({ data, selected }: NodeProps<CollectorRFNode>) {
       <Handle
         type="target"
         position={Position.Left}
-        className="!h-3 !w-3 !border-2 !border-canvas-accent/40 !bg-canvas-elevated"
-      />
+        className="ac-handle ac-handle-target"
+      >
+        <span className="ac-handle-label ac-handle-label-left">in</span>
+      </Handle>
       <div className="flex items-start gap-2.5">
         <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-canvas-accent/15 font-mono text-sm text-canvas-accent ring-1 ring-canvas-accent/25">
           ◇
         </span>
         <div className="min-w-0">
           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-canvas-accent">Collector</div>
-          <div className="truncate text-sm font-semibold text-white">{data.name}</div>
+          <div className="truncate text-sm font-semibold" style={{ color: isDark ? "#f1f5f9" : "#1e293b" }}>{data.name}</div>
         </div>
       </div>
-      <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+      <p className="mt-2 text-[11px] leading-relaxed" style={{ color: isDark ? "#cbd5e1" : "#64748b" }}>
         Merges upstream outputs into the final assembled result for this run.
       </p>
       <div className="mt-3 flex items-center gap-2">
@@ -47,7 +58,7 @@ export function CollectorNode({ data, selected }: NodeProps<CollectorRFNode>) {
             Ready
           </span>
         ) : (
-          <span className="text-[10px] text-slate-500">Idle</span>
+          <span className="text-[10px]" style={{ color: isDark ? "#64748b" : "#94a3b8" }}>Idle</span>
         )}
       </div>
     </div>
