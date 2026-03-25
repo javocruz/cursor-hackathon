@@ -1,49 +1,35 @@
+import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
-import { FlowCanvas } from "./components/FlowCanvas";
-import { EventsLog } from "./components/EventsLog";
-import { Inspector } from "./components/Inspector";
-import { Palette } from "./components/Palette";
-import { Toast } from "./components/Toast";
-import { Toolbar } from "./components/Toolbar";
+import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
+import { WorkspacePage } from "./pages/WorkspacePage";
 import { useAuthStore } from "./stores/authStore";
+
+function isTokenExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1])) as { exp?: number };
+    if (typeof payload.exp !== "number") return false;
+    return payload.exp * 1000 < Date.now();
+  } catch {
+    return true;
+  }
+}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token);
-  if (!token) return <Navigate to="/login" replace />;
-  return <>{children}</>;
-}
+  const logout = useAuthStore((s) => s.logout);
 
-function CanvasLayout() {
-  return (
-    <div className="relative flex h-full flex-col">
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.35]"
-        aria-hidden
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }}
-      />
-      <div className="relative z-10 flex min-h-0 flex-1 flex-col">
-        <Toolbar />
-        <div className="flex min-h-0 flex-1">
-          <Palette />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <div className="relative min-h-0 flex-1">
-              <FlowCanvas />
-            </div>
-            <EventsLog />
-          </div>
-          <Inspector />
-        </div>
-        <Toast />
-      </div>
-    </div>
-  );
+  useEffect(() => {
+    if (token && isTokenExpired(token)) {
+      logout();
+    }
+  }, [token, logout]);
+
+  if (!token || isTokenExpired(token)) return <Navigate to="/login" replace />;
+
+  return <>{children}</>;
 }
 
 export default function App() {
@@ -51,14 +37,24 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route
-        path="/*"
+        path="/dashboard"
         element={
           <ProtectedRoute>
-            <CanvasLayout />
+            <DashboardPage />
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/sandbox/:sandboxId"
+        element={
+          <ProtectedRoute>
+            <WorkspacePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }

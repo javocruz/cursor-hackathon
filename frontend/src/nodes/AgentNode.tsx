@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef } from "react";
-import { Handle, NodeResizer, Position, type NodeProps } from "@xyflow/react";
+import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { Node } from "@xyflow/react";
 
 import type { AgentData } from "../lib/graph";
@@ -55,13 +54,6 @@ export function AgentNode({ id, data, selected }: NodeProps<AgentRFNode>) {
           : "linear-gradient(to bottom, #ffffff, #f1f5f9)",
       }}
     >
-      <NodeResizer
-        minWidth={228}
-        minHeight={200}
-        isVisible={selected}
-        lineClassName="!border-canvas-accent/30"
-        handleClassName="!h-2.5 !w-2.5 !rounded-sm !border !border-canvas-accent/50 !bg-canvas-elevated"
-      />
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-canvas-accent/40 to-transparent"
         aria-hidden

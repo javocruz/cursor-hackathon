@@ -1,4 +1,4 @@
-import { validateGraphForRun, withPrompt } from "../lib/graph";
+import { parseGlobalContextJson, validateGraphForRun, withPrompt } from "../lib/graph";
 import { authFetch, sseUrl } from "../lib/api";
 import { useCanvasStore } from "../stores/canvasStore";
 import { useRunStore } from "../stores/runStore";
@@ -6,6 +6,7 @@ import { useThemeStore } from "../stores/themeStore";
 
 export function Toolbar() {
   const sandboxName = useCanvasStore((s) => s.sandboxName);
+  const sandboxId = useCanvasStore((s) => s.sandboxId);
   const setSandboxName = useCanvasStore((s) => s.setSandboxName);
   const prompt = useCanvasStore((s) => s.prompt);
   const setPrompt = useCanvasStore((s) => s.setPrompt);
@@ -27,16 +28,12 @@ export function Toolbar() {
   const attachEventSource = useRunStore((s) => s.attachEventSource);
 
   const runPipeline = async () => {
-    let globalContext: Record<string, unknown> = {};
-    try {
-      globalContext = JSON.parse(globalContextJson || "{}") as Record<string, unknown>;
-      if (globalContext === null || typeof globalContext !== "object" || Array.isArray(globalContext)) {
-        throw new Error("Global context must be a JSON object.");
-      }
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : "Invalid global context JSON.");
+    const parsedGlobal = parseGlobalContextJson(globalContextJson);
+    if (!parsedGlobal.ok) {
+      showToast(parsedGlobal.error);
       return;
     }
+    const globalContext = parsedGlobal.value;
 
     const validation = validateGraphForRun(nodes, edges, globalContext);
     if (!validation.ok) {
@@ -45,7 +42,7 @@ export function Toolbar() {
     }
 
     const payload = withPrompt(validation.payload, prompt);
-    payload.sandbox_id = sandboxName.replace(/\s+/g, "_").toLowerCase() || "canvas_sandbox";
+    payload.sandbox_id = sandboxId ?? (sandboxName.replace(/\s+/g, "_").toLowerCase() || "canvas_sandbox");
 
     resetForNewRun();
     setRunning(true);
